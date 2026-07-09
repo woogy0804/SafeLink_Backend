@@ -1,4 +1,4 @@
-# 🚧현재 진행 단계: Level 2 (/detect API 구현)
+# 🚧현재 진행 단계: Level 1, 2 (feature_extractor, /detect API)
 
 ####Backend 구조####
 
@@ -6,9 +6,9 @@
 2. routes/detect_routes.py가 POST /detect 요청을 받음
 3. DetectRequest가 url 값이 있는지 검사함
 4. detect_url(url)을 호출함
-5. detection_service.py가 extract_features(url)을 호출함
-6. feature_service.py가 URL 특징 5개를 뽑음
-7. detection_service.py가 임시 점수를 계산함
+(5. detection_service.py가 extract_features(url)을 호출함)
+(6. feature_service.py가 URL 특징 5개를 뽑음)
+(7. detection_service.py가 임시 점수를 계산함)
 8. 점수 기준으로 safe/suspicious/phishing 중 하나를 고름
 9. response_formatter.py가 최종 JSON을 만듦
 10. FastAPI가 사용자에게 JSON 응답을 보냄
