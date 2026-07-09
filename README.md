@@ -13,14 +13,14 @@
 9. response_formatter.py가 최종 JSON을 만듦
 10. FastAPI가 사용자에게 JSON 응답을 보냄
 
-# 🚩detection_service.py랑 feature_service.py는 연결 없이 임시로 채워놓은 상태임
+# detection_service.py랑 feature_service.py는 연결 없이 임시로 채워놓은 상태임
 
 ####테스트용 json####
 {
   "url": "http://test-login-example.com@fake-site.com"
 }
 
-# ⚡다음으로 해야 할 일
+# 🚩다음으로 해야 할 일
 1. services/detection_service.py
    → 실제 모델 연결, gray zone 처리
 
