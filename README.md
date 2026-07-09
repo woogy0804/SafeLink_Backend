@@ -1,6 +1,6 @@
 # 🚧현재 진행 단계: Level 1, 2 (feature_extractor, /detect API)
 
-####Backend 구조####
+####detect API 설명####
 
 1. main.py가 서버를 실행 중
 2. routes/detect_routes.py가 POST /detect 요청을 받음
