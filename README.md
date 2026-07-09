@@ -1,4 +1,6 @@
-# Backend 구조
+# 현재 진행 단계: Level 2 (/detect API 구현)
+
+####Backend 구조####
 
 1. main.py가 서버를 실행 중
 2. routes/detect_routes.py가 POST /detect 요청을 받음
@@ -13,7 +15,7 @@
 
 # 현재 detection_service.py랑 feature_service.py는 연결 없이 임시로 채워놓은 상태임
 
-# 테스트용 json
+####테스트용 json####
 {
   "url": "http://test-login-example.com@fake-site.com"
 }
@@ -33,3 +35,5 @@
 
 5. main.py
    → CORS, /benchmark 라우터 추가
+
+등등...
