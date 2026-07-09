@@ -11,7 +11,7 @@
 9. response_formatter.py가 최종 JSON을 만듦
 10. FastAPI가 사용자에게 JSON 응답을 보냄
 
-# 현재 detection_service.py랑 feature_service.py는 임시로 채워놓은 상태임
+# 현재 detection_service.py랑 feature_service.py는 연결 없이 임시로 채워놓은 상태임
 
 # 테스트용 json
 {
