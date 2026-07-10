@@ -16,23 +16,14 @@ def detect_url(url: str) -> dict:
 
 
 def calculate_temporary_score(features: dict) -> float:
-    score = 0.0
+    if not features:
+        return 1.0
 
-    if features["url_length"] == 1:
-        score += 0.25
+    feature_count = len(features)
+    phishing_count = sum(1 for value in features.values() if value == -1)
+    suspicious_count = sum(1 for value in features.values() if value == 0)
 
-    if features["has_at_symbol"] == 1:
-        score += 0.30
-
-    if features["has_dash"] == 1:
-        score += 0.15
-
-    if features["uses_https"] == 0:
-        score += 0.20
-
-    if features["has_ip_address"] == 1:
-        score += 0.30
-
+    score = (phishing_count + suspicious_count * 0.5) / feature_count
     return min(score, 1.0)
 
 

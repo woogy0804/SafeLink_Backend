@@ -1,0 +1,118 @@
+A 담당 전달사항
+================
+
+현재 B 담당 feature 추출 인터페이스는 아래 파일에 정리되어 있습니다.
+
+파일:
+features/feature_extractor.py
+
+
+1. A에서 사용할 import
+----------------------
+
+from features.feature_extractor import (
+    FEATURE_NAMES,
+    extract_features,
+    extract_feature_dict,
+)
+
+
+2. /detect API에서 기본 사용 방식
+-------------------------------
+
+features = extract_features(url)
+
+반환값:
+- 길이 12의 list
+- 각 값은 반드시 1, 0, -1 중 하나
+
+의미:
+ 1  = Legitimate
+ 0  = Suspicious
+-1  = Phishing
+
+
+3. feature 순서
+--------------
+
+모델 입력 순서는 반드시 아래 순서를 사용해야 합니다.
+
+1. having_ip
+2. url_length
+3. shortener
+4. prefix_suffix
+5. ssl
+6. domain_age
+7. dns
+8. request_url
+9. anchor
+10. sfh
+11. forwarding
+12. iframe
+
+코드에서는 FEATURE_NAMES로 같은 순서를 확인할 수 있습니다.
+
+
+4. 디버깅/JSON 응답용
+-------------------
+
+feature 이름과 값을 같이 보고 싶으면 아래 함수를 사용하면 됩니다.
+
+feature_map = extract_feature_dict(url)
+
+예시:
+{
+    "having_ip": 1,
+    "url_length": 1,
+    "shortener": 1,
+    ...
+}
+
+모델 예측 입력에는 extract_features(url)의 list를 사용하는 것을 권장합니다.
+
+
+5. 예외 처리 규칙
+----------------
+
+각 feature는 독립적으로 실행됩니다.
+특정 feature에서 예외가 발생하거나 잘못된 값이 나오면 해당 feature 값만 -1로 처리됩니다.
+따라서 /detect API 전체가 한 feature 실패 때문에 중단되지는 않습니다.
+
+
+6. 네트워크가 필요한 feature
+---------------------------
+
+아래 feature들은 외부 요청 또는 시스템 조회가 필요할 수 있습니다.
+
+- ssl
+- domain_age
+- dns
+- request_url
+- anchor
+- sfh
+- forwarding
+- iframe
+
+요청 실패, timeout, 조회 실패는 -1로 처리합니다.
+
+
+7. 현재 A가 바로 붙일 수 있는 최소 흐름
+------------------------------------
+
+from features.feature_extractor import extract_features
+
+def detect(url):
+    features = extract_features(url)
+    prediction = model.predict([features])
+    return prediction
+
+
+8. B 쪽 테스트
+-------------
+
+현재 feature 추출 관련 테스트는 아래 명령으로 확인했습니다.
+
+python3 -m unittest discover -s tests
+
+현재 결과:
+Ran 54 tests ... OK

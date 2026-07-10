@@ -1,0 +1,6 @@
+* having_Sub_Domain 오타 수정
+* SSL 인증서 기준을 현재 웹 환경에 맞게 수정
+* WHOIS 조회 실패 시 처리 규칙 명시
+* HTML 요청의 타임아웃, 최대 크기, 리다이렉트 제한 추가
+* Alexa 대신 Tranco 등 현재 사용 가능한 트래픽 데이터 소스로 변경
+* Links_pointing_to_page의 데이터 출처를 현실적인 API 또는 자체 DB로 구체화
