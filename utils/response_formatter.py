@@ -9,6 +9,18 @@ def format_detection_response(url: str, risk: str, score: float, features: dict)
         "url": url,
         "risk": risk,
         "score": round(score, 2),
+        "model_used": "temporary_rule",
+        "gray_zone": False,
         "message": messages.get(risk, "분석 결과를 확인할 수 없습니다."),
         "features": features,
+    }
+
+
+def format_error_response(code: str, message: str) -> dict:
+    return {
+        "success": False,
+        "error": {
+            "code": code,
+            "message": message,
+        },
     }

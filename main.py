@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from routes.detect_routes import router as detect_router
+from utils.response_formatter import format_error_response
 
 app = FastAPI(
     title="SafeLink Backend",
@@ -8,6 +11,20 @@ app = FastAPI(
 )
 
 app.include_router(detect_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    request: Request,
+    exception: RequestValidationError,
+):
+    return JSONResponse(
+        status_code=422,
+        content=format_error_response(
+            "INVALID_REQUEST",
+            "요청 본문에 url 문자열을 입력해주세요.",
+        ),
+    )
 
 
 @app.get("/")
