@@ -32,7 +32,7 @@ README의 완료된 작업 목록Feature Extractor 연결
 URL 검증
 API 에러 처리
 
-####⚠️ 참고
+#### ⚠️ 참고
 현재 score는 머신러닝 모델의 confidence가 아닌 임시 점수
 model_used는 현재 temporary_rule
 gray_zone은 모델 연결 전까지 false
