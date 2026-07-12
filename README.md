@@ -23,7 +23,7 @@
 
 ```text
 기존: url, risk, score, message, features
-변경: url, risk, score, model_used, gray_zone, message, features
+변경: url, risk, score, model_used, gray_zone, message, features```
 
 #### 🗑️ 삭제
 기존 feature_service.py의 임시 5개 Feature 추출 로직
