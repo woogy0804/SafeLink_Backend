@@ -9,23 +9,18 @@ HTML a 태그의 href 중 외부/비정상 링크 비율을 계산한다.
 """
 
 from typing import Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import requests
-from bs4 import BeautifulSoup
+
+from features.domain_utils import (
+    get_registered_domain_from_url,
+    is_same_registered_domain,
+)
+from features.html_context import HtmlAnalysisContext, fetch_html_context
 
 
-REQUEST_TIMEOUT = 5
 INVALID_ANCHOR_PREFIXES = ("#", "javascript:", "mailto:", "tel:", "data:")
-
-
-def _get_hostname(url: str) -> Optional[str]:
-    hostname = urlparse(url).hostname
-    if hostname is None:
-        return None
-
-    hostname = hostname.lower()
-    return hostname[4:] if hostname.startswith("www.") else hostname
 
 
 def _is_invalid_href(href: Optional[str]) -> bool:
@@ -36,14 +31,14 @@ def _is_invalid_href(href: Optional[str]) -> bool:
     return normalized_href == "" or normalized_href.startswith(INVALID_ANCHOR_PREFIXES)
 
 
-def _is_unsafe_anchor(href: Optional[str], base_url: str, base_hostname: str) -> bool:
+def _is_unsafe_anchor(
+    href: Optional[str], base_url: str, base_registered_domain: str
+) -> bool:
     if _is_invalid_href(href):
         return True
 
     href_url = urljoin(base_url, href.strip())
-    href_hostname = _get_hostname(href_url)
-
-    return href_hostname is None or href_hostname != base_hostname
+    return not is_same_registered_domain(href_url, base_registered_domain)
 
 
 def _classify_unsafe_ratio(unsafe_ratio: float) -> int:
@@ -54,19 +49,25 @@ def _classify_unsafe_ratio(unsafe_ratio: float) -> int:
     return -1
 
 
-def anchor_feature(url: str) -> int:
+def anchor_feature(
+    url: str,
+    html_context: Optional[HtmlAnalysisContext] = None,
+) -> int:
     """
     a 태그 href의 비정상 링크 비율을 기준으로 URL을 분류한다.
     """
     try:
-        base_hostname = _get_hostname(url)
-        if base_hostname is None:
+        base_registered_domain = get_registered_domain_from_url(url)
+        if base_registered_domain is None:
             return -1
 
-        response = requests.get(url, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
+        context = html_context or fetch_html_context(url)
+        if context.fetch_failed or context.soup is None:
+            return -1
+        if context.static_unavailable:
+            return 0
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = context.soup
         anchors = soup.find_all("a")
 
         if not anchors:
@@ -74,7 +75,11 @@ def anchor_feature(url: str) -> int:
 
         unsafe_count = sum(
             1 for anchor in anchors
-            if _is_unsafe_anchor(anchor.get("href"), url, base_hostname)
+            if _is_unsafe_anchor(
+                anchor.get("href"),
+                context.document_url,
+                base_registered_domain,
+            )
         )
         unsafe_ratio = (unsafe_count / len(anchors)) * 100
 

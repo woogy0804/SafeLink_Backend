@@ -14,6 +14,8 @@ from features.feature_extractor import (
     FEATURE_NAMES,
     extract_features,
     extract_feature_dict,
+    extract_features_async,
+    extract_feature_dict_async,
 )
 
 
@@ -31,24 +33,28 @@ features = extract_features(url)
  0  = Suspicious
 -1  = Phishing
 
+현재 A의 /detect는 sync route이므로 기존 extract_feature_dict를 그대로 쓰면
+FastAPI worker thread에서 실행됩니다. 추후 async route로 변경할 경우에는
+await extract_feature_dict_async(url)를 사용하면 event loop를 막지 않습니다.
+
 
 3. feature 순서
 --------------
 
 모델 입력 순서는 반드시 아래 순서를 사용해야 합니다.
 
-1. having_ip
-2. url_length
-3. shortener
-4. prefix_suffix
-5. ssl
-6. domain_age
-7. dns
-8. request_url
-9. anchor
-10. sfh
-11. forwarding
-12. iframe
+1. SSLfinal_State
+2. URL_of_Anchor
+3. web_traffic
+4. Prefix_Suffix
+5. having_Sub_Domain
+6. Links_in_tags
+7. Links_pointing_to_page
+8. Request_URL
+9. SFH
+10. age_of_domain
+11. Domain_registeration_length
+12. having_IP_Address
 
 코드에서는 FEATURE_NAMES로 같은 순서를 확인할 수 있습니다.
 
@@ -62,9 +68,9 @@ feature_map = extract_feature_dict(url)
 
 예시:
 {
-    "having_ip": 1,
-    "url_length": 1,
-    "shortener": 1,
+    "SSLfinal_State": 1,
+    "URL_of_Anchor": 1,
+    "web_traffic": 0,
     ...
 }
 
@@ -84,16 +90,39 @@ feature_map = extract_feature_dict(url)
 
 아래 feature들은 외부 요청 또는 시스템 조회가 필요할 수 있습니다.
 
-- ssl
-- domain_age
-- dns
-- request_url
-- anchor
-- sfh
-- forwarding
-- iframe
+- SSLfinal_State
+- URL_of_Anchor
+- web_traffic (로컬 순위 CSV)
+- Links_in_tags
+- Links_pointing_to_page (로컬 백링크 CSV)
+- Request_URL
+- SFH
+- age_of_domain
+- Domain_registeration_length
 
-요청 실패, timeout, 조회 실패는 -1로 처리합니다.
+HTML 요청 실패와 timeout은 관련 HTML feature에서 -1로 처리합니다.
+RDAP 또는 외부 지표 데이터 조회 불가는 0으로 처리합니다.
+
+URL_of_Anchor, Links_in_tags, Request_URL, SFH는 feature_extractor를 통해
+호출할 때 동일한 HTML 요청과 파싱 결과를 공유합니다. 따라서 정상 추출
+흐름에서는 대상 페이지를 한 번만 요청합니다.
+
+공통 HTML 요청은 다음 제한을 적용합니다.
+
+- 최초 URL 및 redirect 목적지별 공인 IP 검사
+- 최대 redirect 5회
+- 최대 HTML 본문 2MB
+- HTML/XHTML Content-Type만 허용
+- 연결 timeout 3초, 읽기 timeout 5초
+
+age_of_domain과 Domain_registeration_length는 feature_extractor를 통해
+호출할 때 RDAP 조회 한 번에서 생성일과 만료일을 함께 사용합니다.
+기본 RDAP bootstrap 주소는 https://rdap.org이며 SAFELINK_RDAP_BASE_URL
+환경 변수로 변경할 수 있습니다.
+
+RDAP 정상 응답은 프로세스 로컬 캐시에 24시간 저장하고, 일시적 조회 실패는
+5분만 저장한 뒤 다시 시도합니다. 여러 서버 프로세스가 캐시를 공유해야 하는
+운영 단계에서는 Redis 캐시 연동이 추가로 필요합니다.
 
 
 7. 현재 A가 바로 붙일 수 있는 최소 흐름
@@ -115,4 +144,36 @@ def detect(url):
 python3 -m unittest discover -s tests
 
 현재 결과:
-Ran 54 tests ... OK
+Ran 165 tests ... OK
+
+
+9. 외부 지표 데이터 준비
+------------------------
+
+Tranco 최신 공식 목록 생성:
+
+python -m scripts.update_tranco
+
+결과 파일:
+features/tranco_ranks.sqlite3
+
+이 파일은 크기가 커 Git에서 제외되므로 배포 환경별 생성 또는 별도 artifact
+전달이 필요합니다.
+
+백링크 CSV를 SQLite로 변환:
+
+python -m scripts.build_metric_snapshot backlinks INPUT.csv --source PROVIDER_NAME --observed-at 2026-07-20T00:00:00Z
+
+백링크 공급자는 아직 미정이며, 데이터에 없는 도메인은 0개로 단정하지 않고
+0(미수집)으로 반환합니다.
+
+
+10. 선택적 Redis 공용 캐시
+------------------------
+
+환경 변수 예시:
+
+SAFELINK_REDIS_URL=redis://localhost:6379/0
+
+설정하면 RDAP 정상 결과를 24시간, 실패 결과를 5분 동안 여러 worker가
+공유합니다. Redis가 없거나 장애가 나도 로컬 TTL 캐시로 자동 폴백합니다.

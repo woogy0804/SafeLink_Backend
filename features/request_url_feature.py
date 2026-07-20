@@ -8,24 +8,20 @@ HTML 문서 안의 img, video, audio 리소스 중 외부 도메인에서 로드
     -1 : 외부 리소스 비율 > 61%
 """
 
-from typing import List, Optional
-from urllib.parse import urljoin, urlparse
+from typing import List
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 
+from features.domain_utils import (
+    get_registered_domain_from_url,
+    is_same_registered_domain,
+)
+from features.html_context import HtmlAnalysisContext, fetch_html_context
 
-REQUEST_TIMEOUT = 5
+
 RESOURCE_TAGS = ("img", "video", "audio")
-
-
-def _get_hostname(url: str) -> Optional[str]:
-    hostname = urlparse(url).hostname
-    if hostname is None:
-        return None
-
-    hostname = hostname.lower()
-    return hostname[4:] if hostname.startswith("www.") else hostname
 
 
 def _get_resource_urls(soup: BeautifulSoup, base_url: str) -> List[str]:
@@ -39,9 +35,8 @@ def _get_resource_urls(soup: BeautifulSoup, base_url: str) -> List[str]:
     return resource_urls
 
 
-def _is_external_resource(resource_url: str, base_hostname: str) -> bool:
-    resource_hostname = _get_hostname(resource_url)
-    return resource_hostname is not None and resource_hostname != base_hostname
+def _is_external_resource(resource_url: str, base_registered_domain: str) -> bool:
+    return not is_same_registered_domain(resource_url, base_registered_domain)
 
 
 def _classify_external_ratio(external_ratio: float) -> int:
@@ -52,27 +47,32 @@ def _classify_external_ratio(external_ratio: float) -> int:
     return -1
 
 
-def request_url_feature(url: str) -> int:
+def request_url_feature(
+    url: str,
+    html_context: HtmlAnalysisContext | None = None,
+) -> int:
     """
     img/video/audio 리소스의 외부 도메인 비율을 기준으로 URL을 분류한다.
     """
     try:
-        base_hostname = _get_hostname(url)
-        if base_hostname is None:
+        base_registered_domain = get_registered_domain_from_url(url)
+        if base_registered_domain is None:
             return -1
 
-        response = requests.get(url, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
+        context = html_context or fetch_html_context(url)
+        if context.fetch_failed or context.soup is None:
+            return -1
+        if context.static_unavailable:
+            return 0
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        resource_urls = _get_resource_urls(soup, url)
+        resource_urls = _get_resource_urls(context.soup, context.document_url)
 
         if not resource_urls:
             return 1
 
         external_count = sum(
             1 for resource_url in resource_urls
-            if _is_external_resource(resource_url, base_hostname)
+            if _is_external_resource(resource_url, base_registered_domain)
         )
         external_ratio = (external_count / len(resource_urls)) * 100
 

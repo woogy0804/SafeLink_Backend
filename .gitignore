@@ -20,5 +20,13 @@ ENV/
 .coverage
 htmlcov/
 
+# Generated external feature snapshots (rebuild with scripts/ tools)
+features/tranco_top_domains.csv
+features/tranco_ranks.sqlite3
+features/tranco_ranks.sqlite3-*
+features/backlink_counts.csv
+features/backlink_counts.sqlite3
+features/backlink_counts.sqlite3-*
+
 .idea/
 .vscode/

@@ -13,6 +13,14 @@ class FakeResponse:
 
 
 class TestRequestUrlFeature(unittest.TestCase):
+    def setUp(self):
+        destination_patcher = patch(
+            "features.safe_http.validate_public_destination",
+            side_effect=lambda url: url,
+        )
+        destination_patcher.start()
+        self.addCleanup(destination_patcher.stop)
+
     def test_legitimate_when_external_ratio_under_22(self):
         html = """
         <img src="/a.png">
@@ -54,6 +62,18 @@ class TestRequestUrlFeature(unittest.TestCase):
 
         with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), 1)
+
+    def test_suspicious_when_page_is_empty_spa_shell(self):
+        html = '<html><body><div id="root"></div><script src="/app.js"></script></body></html>'
+
+        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+            self.assertEqual(request_url_feature("https://example.com"), 0)
+
+    def test_subdomain_of_same_registered_domain_is_internal(self):
+        html = '<img src="https://static.example.com/a.png">'
+
+        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+            self.assertEqual(request_url_feature("https://www.example.com"), 1)
 
     def test_phishing_when_request_fails(self):
         with patch("features.request_url_feature.requests.get", side_effect=Exception("network error")):

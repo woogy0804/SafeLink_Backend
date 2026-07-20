@@ -1,6 +1,44 @@
-* having_Sub_Domain 오타 수정
-* SSL 인증서 기준을 현재 웹 환경에 맞게 수정
-* WHOIS 조회 실패 시 처리 규칙 명시
-* HTML 요청의 타임아웃, 최대 크기, 리다이렉트 제한 추가
-* Alexa 대신 Tranco 등 현재 사용 가능한 트래픽 데이터 소스로 변경
-* Links_pointing_to_page의 데이터 출처를 현실적인 API 또는 자체 DB로 구체화
+구현 반영 사항
+================
+
+* 모델 입력 이름은 학습 데이터와의 호환을 위해 having_Sub_Domain 및
+  Domain_registeration_length 표기를 그대로 사용한다.
+* SSL은 HTTPS 여부, 시스템 신뢰 저장소 기반 인증서 검증, 만료 여부를 검사한다.
+  인증서 유효기간이 짧다는 이유만으로 피싱 처리하지 않는다.
+* RDAP 조회 실패는 피싱(-1)이 아니라 조회 불가/의심(0)으로 처리한다.
+* Alexa 대신 공식 Tranco 스냅샷을 SQLite로 변환해 사용한다. CSV도 호환된다.
+* Links_pointing_to_page는 출처가 명확한 로컬 백링크 CSV/SQLite를 사용한다.
+  데이터에 없는 도메인은 0개가 아니라 미수집(0)으로 처리한다.
+* 같은 등록 도메인의 서브도메인은 Anchor와 Request URL에서는 내부 링크로 본다.
+* SFH는 같은 호스트/상대 경로=1, 같은 등록 도메인의 다른 서브도메인=0,
+  외부 도메인/공백/about:blank=-1로 판정한다.
+* 본문에 정적 텍스트나 분석 가능한 태그가 없는 SPA shell은 HTML 기반
+  Feature에서 0(의심/분석 불가)으로 판정한다.
+* URL_of_Anchor, SFH, Links_in_tags, Request_URL은 feature_extractor에서
+  HTML 요청 1회와 BeautifulSoup 파싱 결과를 공유한다.
+* Feature용 HTTP 요청은 최대 5회 리다이렉트와 2MB HTML 본문만 허용한다.
+* 최초 URL과 모든 리다이렉트 목적지의 DNS 결과를 검사하여 사설망,
+  루프백 또는 비공인 IP가 하나라도 포함되면 요청하지 않는다.
+* HTML/XHTML이 아닌 Content-Type은 분석하지 않는다.
+* age_of_domain과 Domain_registeration_length는 RDAP의 registration 및
+  expiration 이벤트를 한 번 조회해 공유한다.
+* RDAP 정상 결과는 프로세스 로컬 캐시에 24시간, 실패는 5분 저장한다.
+* 등록 도메인은 내장 Public Suffix List로 판별하고 private suffix도 포함한다.
+* IDN은 IDNA 2008/UTS #46 non-transitional 방식으로 Punycode 정규화한다.
+* SSL은 DNS에서 검증한 공인 IP로 직접 연결하고 원래 hostname을 SNI에 쓴다.
+* Tranco/백링크 대용량 파일은 SQLite 단건 조회로 Python 메모리 복제를 막는다.
+
+다음 개선 사항
+==============
+
+* HTML 및 RDAP HTTP 요청은 DNS 검증과 실제 연결 사이의 rebinding 위험이
+  남아 있으므로 IP 고정 클라이언트 또는 배포 환경 egress 방화벽 적용
+* 백링크 공급자와 count 의미(총 링크/참조 페이지/참조 도메인)를 확정
+* Feature 추출 지연시간 p50/p95 및 외부 조회 실패율 측정
+
+Redis 공용 캐시 사용
+====================
+
+SAFELINK_REDIS_URL을 설정하면 RDAP 결과를 여러 프로세스가 공유한다.
+설정하지 않거나 Redis 연결이 실패하면 프로세스 로컬 TTL 캐시만 사용한다.
+정상 결과 TTL은 24시간, 실패 결과 TTL은 5분이다.
