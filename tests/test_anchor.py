@@ -15,7 +15,7 @@ class FakeResponse:
 class TestAnchorFeature(unittest.TestCase):
     def setUp(self):
         destination_patcher = patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         )
         destination_patcher.start()
@@ -29,7 +29,7 @@ class TestAnchorFeature(unittest.TestCase):
         <a href="https://external.example.net">external</a>
         """
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://example.com"), 1)
 
     def test_suspicious_when_unsafe_ratio_between_31_and_67(self):
@@ -40,7 +40,7 @@ class TestAnchorFeature(unittest.TestCase):
         <a href="#">invalid</a>
         """
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://example.com"), 0)
 
     def test_phishing_when_unsafe_ratio_over_67(self):
@@ -51,29 +51,29 @@ class TestAnchorFeature(unittest.TestCase):
         <a href="/safe">safe</a>
         """
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://example.com"), -1)
 
     def test_legitimate_when_no_anchors_exist(self):
         html = "<html><body>No anchors</body></html>"
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://example.com"), 1)
 
     def test_suspicious_when_page_is_empty_spa_shell(self):
         html = '<html><body><div id="root"></div><script src="/app.js"></script></body></html>'
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://example.com"), 0)
 
     def test_subdomain_of_same_registered_domain_is_safe(self):
         html = '<a href="https://help.example.com/faq">help</a>'
 
-        with patch("features.anchor_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(anchor_feature("https://www.example.com"), 1)
 
     def test_phishing_when_request_fails(self):
-        with patch("features.anchor_feature.requests.get", side_effect=Exception("network error")):
+        with patch("features.safe_http._request_pinned_destination", side_effect=Exception("network error")):
             self.assertEqual(anchor_feature("https://example.com"), -1)
 
 

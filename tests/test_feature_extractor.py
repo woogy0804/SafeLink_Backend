@@ -19,7 +19,7 @@ class FakeResponse:
 class TestFeatureExtractor(unittest.TestCase):
     def setUp(self):
         destination_patcher = patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         )
         destination_patcher.start()
@@ -107,7 +107,7 @@ class TestFeatureExtractor(unittest.TestCase):
 
         with patch.object(feature_extractor, "FEATURE_FUNCTIONS", html_features):
             with patch(
-                "features.safe_http.requests.get",
+                "features.safe_http._request_pinned_destination",
                 return_value=FakeResponse(html, url),
             ) as mock_get:
                 self.assertEqual(

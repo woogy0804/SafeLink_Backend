@@ -53,8 +53,10 @@ API 에러 처리
 
 #### ⚠️ 참고
 현재 score는 머신러닝 모델의 confidence가 아닌 임시 점수
-model_used는 현재 temporary_rule
-gray_zone은 모델 연결 전까지 false
+`models/phishing_model_v1.joblib`이 있으면 `model_used`는
+`random_forest_v1`이며 `score`는 피싱 확률입니다. 모델 파일이 없거나 손상된
+경우 `temporary_rule`로 자동 복귀합니다. 확률이 0.4 초과 0.6 미만이면
+`gray_zone=true`, `risk=suspicious`로 반환합니다.
 
 ## 🚧 현재 진행 단계
 
@@ -157,6 +159,32 @@ SAFELINK_REDIS_URL=redis://localhost:6379/0
 
 # feature_service.py는 B 담당 feature_extractor와 연결 완료
 # detection_service.py의 점수 계산은 모델 연결 전까지 사용하는 임시 로직
+
+## 모델 학습
+
+원본 CSV는 `data/raw/phishing_websites.csv`에 둡니다. 현재 정리된 데이터는
+정확히 반복된 두 번째 11,055행을 제거한 파일이며, URL 컬럼이 없으므로 그 외
+feature 동일 행은 삭제하지 않습니다. 대신 동일한 12-feature 벡터가 서로 다른
+train/validation/test split에 들어가지 않도록 그룹 분할합니다.
+
+```text
+python -m scripts.train_phishing_model
+```
+
+생성 파일:
+
+- `models/phishing_model_v1.joblib`: 시연 배포용 추론 artifact
+- `models/phishing_model_v1.metrics.json`: 벤치마크 지표와 데이터 hash
+- `data/processed/*.csv`: 재현용 split, Git 제외
+
+규칙 방식만 실행하려면 다음 환경변수를 설정합니다.
+
+```text
+SAFELINK_MODEL_MODE=rule
+```
+
+백링크 `count` 정의와 DataForSEO 갱신 방법은
+`docs/backlink_data_contract.md`를 참고합니다.
 
 ## 🚩 다음으로 해야 할 일
 

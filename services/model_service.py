@@ -1,0 +1,97 @@
+"""Fault-tolerant inference for the local phishing model artifact."""
+
+import os
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional
+
+import joblib
+
+from features.feature_extractor import FEATURE_NAMES, VALID_FEATURE_VALUES
+from features.file_snapshot import FileSnapshot, get_file_snapshot
+
+
+DEFAULT_MODEL_PATH = (
+    Path(__file__).resolve().parents[1] / "models" / "phishing_model_v1.joblib"
+)
+MODEL_FILE_ENVIRONMENT = "SAFELINK_MODEL_FILE"
+MODEL_MODE_ENVIRONMENT = "SAFELINK_MODEL_MODE"
+
+
+@dataclass(frozen=True)
+class ModelPrediction:
+    phishing_probability: float
+    risk: str
+    model_used: str
+    gray_zone: bool
+
+
+def _model_path() -> Path:
+    configured_path = os.getenv(MODEL_FILE_ENVIRONMENT)
+    return Path(configured_path) if configured_path else DEFAULT_MODEL_PATH
+
+
+@lru_cache(maxsize=2)
+def _load_model_snapshot(snapshot: FileSnapshot) -> Optional[dict]:
+    try:
+        artifact = joblib.load(snapshot.path)
+    except Exception:
+        return None
+    if not isinstance(artifact, dict):
+        return None
+    if artifact.get("feature_names") != list(FEATURE_NAMES):
+        return None
+    estimator = artifact.get("estimator")
+    if estimator is None or not callable(getattr(estimator, "predict_proba", None)):
+        return None
+    return artifact
+
+
+def clear_model_cache() -> None:
+    _load_model_snapshot.cache_clear()
+
+
+def predict_phishing(features: dict[str, int]) -> Optional[ModelPrediction]:
+    """Return a model prediction, or None so the caller can use rule fallback."""
+
+    if os.getenv(MODEL_MODE_ENVIRONMENT, "auto").strip().lower() == "rule":
+        return None
+    if set(features) != set(FEATURE_NAMES):
+        return None
+    values = [features[name] for name in FEATURE_NAMES]
+    if any(value not in VALID_FEATURE_VALUES for value in values):
+        return None
+
+    snapshot = get_file_snapshot(_model_path())
+    if snapshot is None:
+        return None
+    artifact = _load_model_snapshot(snapshot)
+    if artifact is None:
+        return None
+
+    try:
+        estimator = artifact["estimator"]
+        phishing_index = list(estimator.classes_).index(1)
+        probability = float(estimator.predict_proba([values])[0][phishing_index])
+        gray_lower, gray_upper = artifact.get("gray_zone", [0.4, 0.6])
+        gray_lower = float(gray_lower)
+        gray_upper = float(gray_upper)
+        gray_zone = gray_lower < probability < gray_upper
+        if probability >= gray_upper:
+            risk = "phishing"
+        elif probability <= gray_lower:
+            risk = "safe"
+        else:
+            risk = "suspicious"
+        return ModelPrediction(
+            phishing_probability=probability,
+            risk=risk,
+            model_used=(
+                f"{artifact.get('model_name', 'unknown')}_"
+                f"{artifact.get('model_version', 'unknown')}"
+            ),
+            gray_zone=gray_zone,
+        )
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+        return None

@@ -15,7 +15,7 @@ class FakeResponse:
 class TestRequestUrlFeature(unittest.TestCase):
     def setUp(self):
         destination_patcher = patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         )
         destination_patcher.start()
@@ -30,7 +30,7 @@ class TestRequestUrlFeature(unittest.TestCase):
         <img src="https://cdn.example.net/e.png">
         """
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), 1)
 
     def test_suspicious_when_external_ratio_between_22_and_61(self):
@@ -42,7 +42,7 @@ class TestRequestUrlFeature(unittest.TestCase):
         <img src="/e.png">
         """
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), 0)
 
     def test_phishing_when_external_ratio_over_61(self):
@@ -54,29 +54,29 @@ class TestRequestUrlFeature(unittest.TestCase):
         <img src="/e.png">
         """
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), -1)
 
     def test_legitimate_when_no_media_resources(self):
         html = "<html><body>No media</body></html>"
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), 1)
 
     def test_suspicious_when_page_is_empty_spa_shell(self):
         html = '<html><body><div id="root"></div><script src="/app.js"></script></body></html>'
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://example.com"), 0)
 
     def test_subdomain_of_same_registered_domain_is_internal(self):
         html = '<img src="https://static.example.com/a.png">'
 
-        with patch("features.request_url_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(request_url_feature("https://www.example.com"), 1)
 
     def test_phishing_when_request_fails(self):
-        with patch("features.request_url_feature.requests.get", side_effect=Exception("network error")):
+        with patch("features.safe_http._request_pinned_destination", side_effect=Exception("network error")):
             self.assertEqual(request_url_feature("https://example.com"), -1)
 
 

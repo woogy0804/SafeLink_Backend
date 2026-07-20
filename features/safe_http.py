@@ -1,12 +1,12 @@
 """Feature 수집 전용 SSRF 방어 및 제한된 HTTP 클라이언트."""
 
+import http.client
 import ipaddress
 import socket
+import ssl
 from dataclasses import dataclass
 from typing import Set, Union
-from urllib.parse import urljoin, urlparse
-
-import requests
+from urllib.parse import urljoin, urlparse, urlunsplit
 
 from features.domain_utils import normalize_hostname
 
@@ -53,6 +53,81 @@ class ResolvedDestination:
     hostname: str
     port: int
     addresses: tuple[Union[ipaddress.IPv4Address, ipaddress.IPv6Address], ...]
+
+
+class _PinnedResponse:
+    """Small response adapter that owns an IP-pinned HTTP connection."""
+
+    def __init__(self, response: http.client.HTTPResponse, connection) -> None:
+        self._response = response
+        self._connection = connection
+        self.status_code = response.status
+        self.headers = response.headers
+        self.encoding = response.headers.get_content_charset() or "utf-8"
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise SafeHttpError(f"HTTP request failed with status {self.status_code}")
+
+    def iter_content(self, chunk_size: int):
+        while True:
+            chunk = self._response.read(chunk_size)
+            if not chunk:
+                return
+            yield chunk
+
+    def close(self) -> None:
+        try:
+            self._response.close()
+        finally:
+            self._connection.close()
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, destination: ResolvedDestination, address) -> None:
+        super().__init__(
+            destination.hostname,
+            destination.port,
+            timeout=CONNECT_TIMEOUT,
+        )
+        self._destination = destination
+        self._address = address
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection(
+            (str(self._address), self._destination.port),
+            self.timeout,
+            self.source_address,
+        )
+        self.sock.settimeout(READ_TIMEOUT)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, destination: ResolvedDestination, address) -> None:
+        super().__init__(
+            destination.hostname,
+            destination.port,
+            timeout=CONNECT_TIMEOUT,
+            context=ssl.create_default_context(),
+        )
+        self._destination = destination
+        self._address = address
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection(
+            (str(self._address), self._destination.port),
+            self.timeout,
+            self.source_address,
+        )
+        try:
+            self.sock = self._context.wrap_socket(
+                raw_socket,
+                server_hostname=self._destination.hostname,
+            )
+            self.sock.settimeout(READ_TIMEOUT)
+        except Exception:
+            raw_socket.close()
+            raise
 
 
 def _resolve_addresses(
@@ -128,6 +203,53 @@ def validate_public_destination(url: str) -> str:
     return url
 
 
+def _request_target(url: str) -> str:
+    parsed_url = urlparse(url)
+    return urlunsplit(("", "", parsed_url.path or "/", parsed_url.query, ""))
+
+
+def _host_header(destination: ResolvedDestination) -> str:
+    default_port = 443 if urlparse(destination.url).scheme.lower() == "https" else 80
+    hostname = destination.hostname
+    try:
+        if ipaddress.ip_address(hostname).version == 6:
+            hostname = f"[{hostname}]"
+    except ValueError:
+        pass
+    if destination.port != default_port:
+        return f"{hostname}:{destination.port}"
+    return hostname
+
+
+def _request_pinned_destination(destination: ResolvedDestination):
+    """Connect only to IPs returned by the validated DNS lookup.
+
+    The original hostname remains in the Host header and TLS SNI/certificate
+    verification, but it is never resolved a second time by the HTTP client.
+    """
+
+    scheme = urlparse(destination.url).scheme.lower()
+    last_error = None
+    for address in destination.addresses:
+        connection = None
+        try:
+            connection_class = (
+                _PinnedHTTPSConnection if scheme == "https" else _PinnedHTTPConnection
+            )
+            connection = connection_class(destination, address)
+            headers = {**REQUEST_HEADERS, "Host": _host_header(destination)}
+            connection.request("GET", _request_target(destination.url), headers=headers)
+            return _PinnedResponse(connection.getresponse(), connection)
+        except (OSError, ssl.SSLError, http.client.HTTPException) as error:
+            last_error = error
+            if connection is not None:
+                connection.close()
+
+    if last_error is not None:
+        raise last_error
+    raise SafeHttpError("No validated public address is available")
+
+
 def _response_headers(response) -> dict:
     headers = getattr(response, "headers", None)
     return headers if headers is not None else {}
@@ -183,14 +305,8 @@ def fetch_html_document(url: str) -> HtmlDocument:
     current_url = url.strip()
 
     for redirect_count in range(MAX_REDIRECTS + 1):
-        validate_public_destination(current_url)
-        response = requests.get(
-            current_url,
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
-            allow_redirects=False,
-            stream=True,
-            headers=REQUEST_HEADERS,
-        )
+        destination = resolve_public_destination(current_url)
+        response = _request_pinned_destination(destination)
 
         try:
             status_code = int(getattr(response, "status_code", 200))

@@ -1,11 +1,12 @@
+import ipaddress
 import socket
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from features.safe_http import (
     MAX_REDIRECTS,
     MAX_RESPONSE_BYTES,
-    REQUEST_HEADERS,
+    ResolvedDestination,
     RedirectLimitError,
     ResponseTooLargeError,
     UnsafeDestinationError,
@@ -13,6 +14,7 @@ from features.safe_http import (
     fetch_html_document,
     resolve_public_destination,
     validate_public_destination,
+    _PinnedHTTPSConnection,
 )
 
 
@@ -89,7 +91,7 @@ class TestSafeHttp(unittest.TestCase):
             return_value=PUBLIC_ADDRESS_INFO,
         ):
             with patch(
-                "features.safe_http.requests.get",
+                "features.safe_http._request_pinned_destination",
                 return_value=redirect_response,
             ) as mock_get:
                 with self.assertRaises(UnsafeDestinationError):
@@ -104,10 +106,10 @@ class TestSafeHttp(unittest.TestCase):
             for _ in range(MAX_REDIRECTS + 1)
         ]
         with patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         ):
-            with patch("features.safe_http.requests.get", side_effect=responses) as mock_get:
+            with patch("features.safe_http._request_pinned_destination", side_effect=responses) as mock_get:
                 with self.assertRaises(RedirectLimitError):
                     fetch_html_document("https://example.com")
 
@@ -123,10 +125,10 @@ class TestSafeHttp(unittest.TestCase):
             text="small fake body",
         )
         with patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         ):
-            with patch("features.safe_http.requests.get", return_value=response):
+            with patch("features.safe_http._request_pinned_destination", return_value=response):
                 with self.assertRaises(ResponseTooLargeError):
                     fetch_html_document("https://example.com")
 
@@ -138,10 +140,10 @@ class TestSafeHttp(unittest.TestCase):
             chunks=[b"a" * MAX_RESPONSE_BYTES, b"b"],
         )
         with patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         ):
-            with patch("features.safe_http.requests.get", return_value=response):
+            with patch("features.safe_http._request_pinned_destination", return_value=response):
                 with self.assertRaises(ResponseTooLargeError):
                     fetch_html_document("https://example.com")
 
@@ -151,10 +153,10 @@ class TestSafeHttp(unittest.TestCase):
             text="binary",
         )
         with patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         ):
-            with patch("features.safe_http.requests.get", return_value=response):
+            with patch("features.safe_http._request_pinned_destination", return_value=response):
                 with self.assertRaises(UnsupportedContentTypeError):
                     fetch_html_document("https://example.com/file")
 
@@ -164,11 +166,11 @@ class TestSafeHttp(unittest.TestCase):
             text="<html><body>ok</body></html>",
         )
         with patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         ):
             with patch(
-                "features.safe_http.requests.get",
+                "features.safe_http._request_pinned_destination",
                 return_value=response,
             ) as mock_get:
                 document = fetch_html_document("https://example.com")
@@ -176,13 +178,38 @@ class TestSafeHttp(unittest.TestCase):
         self.assertEqual(document.final_url, "https://example.com")
         self.assertEqual(document.text, "<html><body>ok</body></html>")
         self.assertTrue(response.closed)
-        mock_get.assert_called_once_with(
-            "https://example.com",
-            timeout=(3, 5),
-            allow_redirects=False,
-            stream=True,
-            headers=REQUEST_HEADERS,
+        mock_get.assert_called_once_with("https://example.com")
+
+    def test_https_connection_uses_validated_ip_and_original_hostname_for_sni(self):
+        destination = ResolvedDestination(
+            url="https://example.com/login",
+            hostname="example.com",
+            port=443,
+            addresses=(ipaddress.ip_address("93.184.216.34"),),
         )
+        raw_socket = Mock()
+        tls_socket = Mock()
+        ssl_context = Mock()
+        ssl_context.wrap_socket.return_value = tls_socket
+
+        with patch("features.safe_http.ssl.create_default_context", return_value=ssl_context):
+            connection = _PinnedHTTPSConnection(destination, destination.addresses[0])
+            with patch(
+                "features.safe_http.socket.create_connection",
+                return_value=raw_socket,
+            ) as create_connection:
+                connection.connect()
+
+        create_connection.assert_called_once_with(
+            ("93.184.216.34", 443),
+            3,
+            None,
+        )
+        ssl_context.wrap_socket.assert_called_once_with(
+            raw_socket,
+            server_hostname="example.com",
+        )
+        tls_socket.settimeout.assert_called_once_with(5)
 
 
 if __name__ == "__main__":

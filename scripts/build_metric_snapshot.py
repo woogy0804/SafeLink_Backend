@@ -141,6 +141,7 @@ def build_backlink_database(
     *,
     source: str,
     observed_at: str,
+    count_definition: str = "live_referring_main_domains",
     minimum_rows: int = 1,
 ) -> int:
     temporary_path = _temporary_database_path(output_path)
@@ -182,6 +183,7 @@ def build_backlink_database(
             connection,
             {
                 "built_at": datetime.now(timezone.utc).isoformat(),
+                "count_definition": count_definition,
                 "observed_at": observed_at,
                 "row_count": str(row_count),
                 "source": source,
@@ -216,6 +218,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     backlink_parser.add_argument("--source", required=True)
     backlink_parser.add_argument("--observed-at", required=True)
+    backlink_parser.add_argument(
+        "--count-definition",
+        default="live_referring_main_domains",
+    )
     backlink_parser.add_argument("--minimum-rows", type=int, default=1)
     return parser
 
@@ -236,6 +242,7 @@ def main() -> None:
             arguments.output,
             source=arguments.source,
             observed_at=arguments.observed_at,
+            count_definition=arguments.count_definition,
             minimum_rows=arguments.minimum_rows,
         )
     print(f"완료: {row_count:,}개 도메인 -> {arguments.output}")

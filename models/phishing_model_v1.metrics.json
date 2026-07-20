@@ -1,0 +1,95 @@
+{
+  "model_name": "random_forest",
+  "model_version": "v1",
+  "trained_at": "2026-07-20T12:38:42.603346+00:00",
+  "input_file": "phishing_websites.csv",
+  "input_sha256": "fe79e9849a8ce98e3d468d429f308247d78a01d2dc85e5ceb9ee9c8b360dcfaa",
+  "feature_names": [
+    "SSLfinal_State",
+    "URL_of_Anchor",
+    "web_traffic",
+    "Prefix_Suffix",
+    "having_Sub_Domain",
+    "Links_in_tags",
+    "Links_pointing_to_page",
+    "Request_URL",
+    "SFH",
+    "age_of_domain",
+    "Domain_registeration_length",
+    "having_IP_Address"
+  ],
+  "source": {
+    "raw_rows": 11055,
+    "training_rows": 11055,
+    "unique_12_feature_vectors": 3127,
+    "class_counts": {
+      "legitimate": 6157,
+      "phishing": 4898
+    }
+  },
+  "split": {
+    "strategy": "grouped_by_identical_12_feature_vector",
+    "train_rows": 7824,
+    "validation_rows": 1754,
+    "test_rows": 1477,
+    "train_groups": 2188,
+    "validation_groups": 469,
+    "test_groups": 470
+  },
+  "validation_candidates": {
+    "logistic_regression": {
+      "accuracy": 0.9310148232611174,
+      "precision": 0.9309045226130653,
+      "recall": 0.9182156133828996,
+      "f1": 0.924516531503431,
+      "roc_auc": 0.9792621059917904,
+      "average_precision": 0.9776019638946574,
+      "confusion_matrix": [
+        [
+          892,
+          55
+        ],
+        [
+          66,
+          741
+        ]
+      ]
+    },
+    "random_forest": {
+      "accuracy": 0.9464082098061574,
+      "precision": 0.9395807644882861,
+      "recall": 0.9442379182156134,
+      "f1": 0.9419035846724351,
+      "roc_auc": 0.9903111501918928,
+      "average_precision": 0.9879387383839889,
+      "confusion_matrix": [
+        [
+          898,
+          49
+        ],
+        [
+          45,
+          762
+        ]
+      ]
+    }
+  },
+  "test": {
+    "accuracy": 0.9444820582261341,
+    "precision": 0.9438377535101404,
+    "recall": 0.9293394777265745,
+    "f1": 0.9365325077399381,
+    "roc_auc": 0.9857585461740738,
+    "average_precision": 0.9834720880842716,
+    "confusion_matrix": [
+      [
+        790,
+        36
+      ],
+      [
+        46,
+        605
+      ]
+    ]
+  }
+}

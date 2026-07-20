@@ -15,7 +15,7 @@ class FakeResponse:
 class TestLinksInTagsFeature(unittest.TestCase):
     def setUp(self):
         destination_patcher = patch(
-            "features.safe_http.validate_public_destination",
+            "features.safe_http.resolve_public_destination",
             side_effect=lambda url: url,
         )
         destination_patcher.start()
@@ -31,7 +31,7 @@ class TestLinksInTagsFeature(unittest.TestCase):
         <link href="/d.css" rel="stylesheet">
         <script src="https://cdn.example.net/x.js"></script>
         """
-        with patch("features.links_in_tags_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(links_in_tags_feature("https://example.com"), 1)
 
     def test_suspicious_when_external_ratio_is_between_17_and_81(self):
@@ -39,7 +39,7 @@ class TestLinksInTagsFeature(unittest.TestCase):
         <script src="/a.js"></script>
         <script src="https://cdn.example.net/b.js"></script>
         """
-        with patch("features.links_in_tags_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(links_in_tags_feature("https://example.com"), 0)
 
     def test_phishing_when_external_ratio_is_over_81(self):
@@ -47,17 +47,17 @@ class TestLinksInTagsFeature(unittest.TestCase):
         <script src="https://cdn1.example.net/a.js"></script>
         <link href="https://cdn2.example.net/a.css" rel="stylesheet">
         """
-        with patch("features.links_in_tags_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(links_in_tags_feature("https://example.com"), -1)
 
     def test_meta_refresh_url_is_counted(self):
         html = '<meta http-equiv="refresh" content="0; url=https://evil.example.net">'
-        with patch("features.links_in_tags_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(links_in_tags_feature("https://example.com"), -1)
 
     def test_suspicious_when_page_is_empty_spa_shell(self):
         html = '<html><body><div id="root"></div><script src="/app.js"></script></body></html>'
-        with patch("features.links_in_tags_feature.requests.get", return_value=FakeResponse(html)):
+        with patch("features.safe_http._request_pinned_destination", return_value=FakeResponse(html)):
             self.assertEqual(links_in_tags_feature("https://example.com"), 0)
 
 
