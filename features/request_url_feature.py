@@ -8,7 +8,7 @@ HTML 문서 안의 img, video, audio 리소스 중 외부 도메인에서 로드
     -1 : 외부 리소스 비율 > 61%
 """
 
-from typing import List
+from typing import List, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -49,7 +49,7 @@ def _classify_external_ratio(external_ratio: float) -> int:
 
 def request_url_feature(
     url: str,
-    html_context: HtmlAnalysisContext | None = None,
+    html_context: Optional[HtmlAnalysisContext] = None,
 ) -> int:
     """
     img/video/audio 리소스의 외부 도메인 비율을 기준으로 URL을 분류한다.

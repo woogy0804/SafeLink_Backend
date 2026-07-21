@@ -1,3 +1,6 @@
+from typing import Optional
+
+
 def format_detection_response(
     url: str,
     risk: str,
@@ -6,7 +9,7 @@ def format_detection_response(
     *,
     model_used: str = "temporary_rule",
     gray_zone: bool = False,
-    rule_score: float | None = None,
+    rule_score: Optional[float] = None,
 ) -> dict:
     messages = {
         "safe": "안전한 URL로 판단됩니다.",

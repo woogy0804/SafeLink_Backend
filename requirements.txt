@@ -2,8 +2,8 @@ fastapi
 uvicorn
 requests
 beautifulsoup4
-tldextract==5.3.1
+tldextract==5.3.0
 idna==3.18
-redis==8.0.1
+redis==7.0.1
 joblib==1.5.3
-scikit-learn==1.9.0
+scikit-learn==1.6.1
