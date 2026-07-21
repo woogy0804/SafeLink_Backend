@@ -2,6 +2,16 @@
 
 ## 📢 최근 변경사항
 
+### 2026-07-22 (코드 호환성 문제 해결)
+- requirements.txt
+  - 현재 환경에서 설치 가능한 버전으로 조정
+
+- features/request_url_feature.py
+  - Python 3.9 호환 타입 힌트 수정
+
+- utils/response_formatter.py
+  - Python 3.9 호환 타입 힌트 수정
+
 ### 2026-07-20 (B 담당 Feature 작업)
 
 - RDAP 생성일/만료일 1회 조회 및 프로세스 로컬 TTL 캐시 적용
