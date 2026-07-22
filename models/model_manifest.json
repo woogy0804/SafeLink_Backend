@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "label_mapping": {
+    "0": "legitimate",
+    "1": "phishing"
+  },
+  "feature_values": [-1, 0, 1],
+  "feature_names": [
+    "SSLfinal_State",
+    "URL_of_Anchor",
+    "web_traffic",
+    "Prefix_Suffix",
+    "having_Sub_Domain",
+    "Links_in_tags",
+    "Links_pointing_to_page",
+    "Request_URL",
+    "SFH",
+    "age_of_domain",
+    "Domain_registeration_length",
+    "having_IP_Address"
+  ],
+  "pipeline": {
+    "first_stage": "logistic_model.pkl",
+    "gray_zone": [0.3, 0.7],
+    "second_stage": "random_forest_model.pkl",
+    "second_stage_condition": "0.3 < logistic_probability < 0.7",
+    "decision_threshold": 0.5
+  }
+}

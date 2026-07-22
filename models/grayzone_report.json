@@ -1,0 +1,99 @@
+{
+  "dataset": "C:\\Users\\user\\Desktop\\backend\\data\\processed\\validation_v1.csv",
+  "rows": 1754,
+  "selection_rule": "highest F1, then recall, then lower second-stage rate",
+  "recommended_gray_zone": [
+    0.3,
+    0.7
+  ],
+  "candidates": [
+    {
+      "lower": 0.45,
+      "upper": 0.55,
+      "second_stage_rows": 23,
+      "second_stage_rate": 0.013112884834663626,
+      "accuracy": 0.93557582668187,
+      "precision": 0.9326683291770573,
+      "recall": 0.9268897149938042,
+      "f1": 0.9297700435052828,
+      "roc_auc": 0.9794505311889499,
+      "average_precision": 0.9778392984527775,
+      "confusion_matrix": [
+        [
+          893,
+          54
+        ],
+        [
+          59,
+          748
+        ]
+      ]
+    },
+    {
+      "lower": 0.4,
+      "upper": 0.6,
+      "second_stage_rows": 81,
+      "second_stage_rate": 0.046180159635119726,
+      "accuracy": 0.9389965792474344,
+      "precision": 0.9375,
+      "recall": 0.929368029739777,
+      "f1": 0.9334163036714375,
+      "roc_auc": 0.9805418271224986,
+      "average_precision": 0.9788534394119701,
+      "confusion_matrix": [
+        [
+          897,
+          50
+        ],
+        [
+          57,
+          750
+        ]
+      ]
+    },
+    {
+      "lower": 0.35,
+      "upper": 0.65,
+      "second_stage_rows": 122,
+      "second_stage_rate": 0.06955530216647662,
+      "accuracy": 0.9372862029646523,
+      "precision": 0.9383647798742139,
+      "recall": 0.9244114002478315,
+      "f1": 0.9313358302122348,
+      "roc_auc": 0.9816763038303964,
+      "average_precision": 0.9800218973499337,
+      "confusion_matrix": [
+        [
+          898,
+          49
+        ],
+        [
+          61,
+          746
+        ]
+      ]
+    },
+    {
+      "lower": 0.3,
+      "upper": 0.7,
+      "second_stage_rows": 150,
+      "second_stage_rate": 0.08551881413911061,
+      "accuracy": 0.9407069555302167,
+      "precision": 0.9432534678436317,
+      "recall": 0.9268897149938042,
+      "f1": 0.935,
+      "roc_auc": 0.9826838552318742,
+      "average_precision": 0.9809793653467643,
+      "confusion_matrix": [
+        [
+          902,
+          45
+        ],
+        [
+          59,
+          748
+        ]
+      ]
+    }
+  ]
+}

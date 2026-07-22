@@ -1,0 +1,64 @@
+{
+  "dataset": "C:\\Users\\user\\Desktop\\backend\\data\\processed\\test_v1.csv",
+  "rows": 1477,
+  "logistic_regression": {
+    "accuracy": 0.9085985104942451,
+    "precision": 0.8969230769230769,
+    "recall": 0.8955453149001537,
+    "f1": 0.8962336664104535,
+    "roc_auc": 0.973140595768105,
+    "average_precision": 0.970391848600936,
+    "confusion_matrix": [
+      [
+        759,
+        67
+      ],
+      [
+        68,
+        583
+      ]
+    ]
+  },
+  "random_forest": {
+    "accuracy": 0.936357481381178,
+    "precision": 0.9470304975922953,
+    "recall": 0.9062980030721967,
+    "f1": 0.9262166405023547,
+    "roc_auc": 0.9847840721854625,
+    "average_precision": 0.9823055236191496,
+    "confusion_matrix": [
+      [
+        793,
+        33
+      ],
+      [
+        61,
+        590
+      ]
+    ]
+  },
+  "cascade": {
+    "gray_zone": [
+      0.3,
+      0.7
+    ],
+    "second_stage_rows": 225,
+    "second_stage_rate": 0.15233581584292485,
+    "accuracy": 0.9356804333107651,
+    "precision": 0.9357366771159875,
+    "recall": 0.9170506912442397,
+    "f1": 0.9262994569433669,
+    "roc_auc": 0.979407728099441,
+    "average_precision": 0.9763668588606316,
+    "confusion_matrix": [
+      [
+        785,
+        41
+      ],
+      [
+        54,
+        597
+      ]
+    ]
+  }
+}
