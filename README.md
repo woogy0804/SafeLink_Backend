@@ -2,6 +2,15 @@
 
 ## 📢 최근 변경사항
 
+### 2026-07-22 (2단계 피싱 모델 연동)
+
+- `/detect`를 Logistic Regression 1차 판별과 Random Forest 2차 판별에 연결
+- LR 피싱 확률이 `0.3` 초과, `0.7` 미만일 때만 RF 실행
+- 최종 피싱 확률을 `score`로, RF 실행 여부를 `gray_zone`으로 반환
+- 2단계 모델 실패 시 기존 단일 모델, 임시 규칙 순서로 자동 폴백
+- scikit-learn 1.9.0 모델을 Python 3.9용 1.6.1 환경에서 실행하도록 호환 처리
+- 저장된 실제 모델을 포함한 전체 회귀 테스트 188개 통과
+
 ### 2026-07-22 (코드 호환성 문제 해결)
 - requirements.txt
   - 현재 환경에서 설치 가능한 버전으로 조정
@@ -62,17 +71,19 @@ URL 검증
 API 에러 처리
 
 #### ⚠️ 참고
-현재 score는 머신러닝 모델의 confidence가 아닌 임시 점수
-`models/phishing_model_v1.joblib`이 있으면 `model_used`는
-`random_forest_v1`이며 `score`는 피싱 확률입니다. 모델 파일이 없거나 손상된
-경우 `temporary_rule`로 자동 복귀합니다. 확률이 0.4 초과 0.6 미만이면
-`gray_zone=true`, `risk=suspicious`로 반환합니다.
+
+현재 `score`는 2단계 모델이 최종 판정에 사용한 피싱 확률입니다. LR 확률이
+`0.3` 초과, `0.7` 미만이면 RF가 2차 판별하며, 이때 `gray_zone=true`입니다.
+2단계 모델을 사용할 수 없으면 기존 `models/phishing_model_v1.joblib`, 임시 규칙
+순서로 자동 폴백합니다. 임시 규칙을 사용한 경우에만 `model_used`가
+`temporary_rule`입니다.
 
 ## 🚧 현재 진행 단계
 
-- 🚧 Level 1: 12개 Feature Extractor 핵심 로직 완료, 운영 준비 약 93%
+- 🚧 Level 1: 12개 Feature Extractor 핵심 로직 완료, 외부 데이터·운영 검증 필요
 - ✅ Level 2: `/detect` API 구현 완료
-- ⏸️ Level 3: 머신러닝 모델 학습·연동은 현재 보류
+- ✅ Level 3: Logistic Regression + Random Forest 2단계 모델 연동 완료
+- 🚧 Level 4: 프론트 연동용 CORS와 배포 설정 준비
 
 ## Top 12 Feature 순서
 
@@ -159,16 +170,19 @@ SAFELINK_REDIS_URL=redis://localhost:6379/0
 1. main.py가 서버를 실행 중
 2. routes/detect_routes.py가 POST /detect 요청을 받음
 3. DetectRequest가 url 값이 있는지 검사함
-4. detect_url(url)을 호출함
+4. URL 프로토콜, 사용자 정보, localhost 및 사설 IP 여부를 검증함
 5. detection_service.py가 extract_features(url)을 호출함
 6. feature_service.py가 features/feature_extractor.py의 Top 12 feature를 호출함
-7. detection_service.py가 1 / 0 / -1 feature 값을 기준으로 임시 점수를 계산함
-8. 점수 기준으로 safe/suspicious/phishing 중 하나를 고름
-9. response_formatter.py가 최종 JSON을 만듦
-10. FastAPI가 사용자에게 JSON 응답을 보냄
+7. SSL, HTML, RDAP 네트워크 작업을 병렬로 실행함
+8. Logistic Regression으로 1차 피싱 확률을 계산함
+9. LR 확률이 `0.3 < p < 0.7`이면 Random Forest로 2차 판별함
+10. 모델 실패 시 기존 단일 모델, 임시 규칙 순서로 폴백함
+11. response_formatter.py가 최종 JSON을 만듦
+12. FastAPI가 사용자에게 JSON 응답을 보냄
 
-# feature_service.py는 B 담당 feature_extractor와 연결 완료
-# detection_service.py의 점수 계산은 모델 연결 전까지 사용하는 임시 로직
+`feature_service.py`는 B 담당 `feature_extractor`와 연결되어 있습니다.
+`detection_service.py`의 임시 점수는 모델 실패 시 폴백과 비교용 `rule_score`로
+사용합니다.
 
 ## 모델 학습
 
@@ -176,6 +190,16 @@ SAFELINK_REDIS_URL=redis://localhost:6379/0
 정확히 반복된 두 번째 11,055행을 제거한 파일이며, URL 컬럼이 없으므로 그 외
 feature 동일 행은 삭제하지 않습니다. 대신 동일한 12-feature 벡터가 서로 다른
 train/validation/test split에 들어가지 않도록 그룹 분할합니다.
+
+분리한 데이터의 용도는 고정합니다.
+
+- `train_v1.csv` 70%: LR/RF 학습
+- `validation_v1.csv` 15%: 모델 선택과 Gray Zone 결정
+- `test_v1.csv` 15%: 모든 설정을 확정한 뒤 최종 성능을 한 번 평가
+
+Test 결과를 보고 모델, Feature, 임계값 또는 Gray Zone을 수정하면 해당 Test는
+더 이상 독립적인 최종 평가 데이터가 아닙니다. 이 경우 새로운 Test 데이터가
+필요합니다.
 
 ```text
 python -m scripts.train_phishing_model
@@ -187,11 +211,41 @@ python -m scripts.train_phishing_model
 - `models/phishing_model_v1.metrics.json`: 벤치마크 지표와 데이터 hash
 - `data/processed/*.csv`: 재현용 split, Git 제외
 
+2단계 모델 학습과 평가 명령:
+
+```text
+python -m ml.train_logistic
+python -m ml.train_random_forest
+python -m ml.grayzone_test
+python -m ml.evaluate_model
+```
+
+`ml.grayzone_test`는 Validation split으로 Gray Zone 후보를 비교하고,
+`ml.evaluate_model`은 확정된 설정을 Test split에서 평가하여
+`models/model_evaluation.json`에 결과를 저장합니다. 원본 및 split 데이터는
+Git에 포함하지 않으므로 팀의 접근 제한 저장소에 원본과 SHA-256을 보관해야
+동일한 학습과 평가를 재현할 수 있습니다.
+
 규칙 방식만 실행하려면 다음 환경변수를 설정합니다.
 
 ```text
 SAFELINK_MODEL_MODE=rule
 ```
+
+지원하는 모델 모드는 다음과 같습니다.
+
+- `auto`: 2단계 모델 → 기존 단일 모델 → 임시 규칙
+- `cascade`: 2단계 모델만 시도한 뒤 실패하면 임시 규칙
+- `legacy`: 기존 `phishing_model_v1.joblib` 사용
+- `rule`: 모델을 사용하지 않고 임시 규칙 사용
+
+### Benchmark 제공 방식
+
+모델 성능을 프론트나 관리자 화면에 표시할 필요가 있을 때만 읽기 전용
+`GET /benchmark`를 구현합니다. 이 API는 요청 시 테스트 데이터를 다시 평가하지
+않고, 오프라인 평가가 생성한 `models/model_evaluation.json`에서 공개 가능한
+성능 지표만 읽어 반환해야 합니다. 성능 화면이 필요하지 않다면 `/benchmark`
+API와 별도 Benchmark DB는 만들 필요가 없습니다.
 
 백링크 `count` 정의와 DataForSEO 갱신 방법은
 `docs/backlink_data_contract.md`를 참고합니다.
@@ -203,15 +257,12 @@ SAFELINK_MODEL_MODE=rule
 - 백링크 데이터 공급자와 count 정의 확정
 - HTML/RDAP 요청의 DNS 검증-연결 간 재바인딩 방어(IP 고정 또는 egress 정책)
 - Feature 추출 p50/p95 벤치마크
-- 모델 학습·Gray Zone 실험은 현재 보류
+- 원본 학습 데이터와 고정 split의 팀 공용 보관 위치 확정
 
 ### A 담당
 
-- Logistic Regression 모델 연결
-- Gray Zone 처리
-- Random Forest 2차 검사 연결
-- 실제 confidence 반환
-- `/benchmark` API 구현
-- CORS 설정
-
-등등...
+- 프론트 개발·운영 Origin 확정 후 CORS 설정
+- 실제 URL을 이용한 `/detect` 통합·응답시간 점검
+- 배포 환경에서 모델 및 외부 데이터 파일 경로 설정
+- 필요 시 저장된 평가 결과만 반환하는 읽기 전용 `/benchmark` 구현
+- scikit-learn 버전을 통일한 환경에서 모델 재학습 및 artifact 교체

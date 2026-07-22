@@ -10,6 +10,8 @@ import joblib
 
 from features.feature_extractor import FEATURE_NAMES, VALID_FEATURE_VALUES
 from features.file_snapshot import FileSnapshot, get_file_snapshot
+from ml.inference import clear_model_cache as clear_cascade_model_cache
+from ml.inference import predict_feature_dict
 
 
 DEFAULT_MODEL_PATH = (
@@ -50,18 +52,41 @@ def _load_model_snapshot(snapshot: FileSnapshot) -> Optional[dict]:
 
 def clear_model_cache() -> None:
     _load_model_snapshot.cache_clear()
+    clear_cascade_model_cache()
+
+
+def _predict_cascade(features: dict[str, int]) -> Optional[ModelPrediction]:
+    try:
+        prediction = predict_feature_dict(features)
+    except Exception:
+        # Model loading and inference must not prevent rule-based detection.
+        return None
+    return ModelPrediction(
+        phishing_probability=prediction.phishing_probability,
+        risk=prediction.risk,
+        model_used=prediction.model_used,
+        gray_zone=prediction.gray_zone,
+    )
 
 
 def predict_phishing(features: dict[str, int]) -> Optional[ModelPrediction]:
-    """Return a model prediction, or None so the caller can use rule fallback."""
+    """Prefer the two-stage model, then fall back to the legacy local model."""
 
-    if os.getenv(MODEL_MODE_ENVIRONMENT, "auto").strip().lower() == "rule":
+    model_mode = os.getenv(MODEL_MODE_ENVIRONMENT, "auto").strip().lower()
+    if model_mode == "rule":
         return None
     if set(features) != set(FEATURE_NAMES):
         return None
     values = [features[name] for name in FEATURE_NAMES]
     if any(value not in VALID_FEATURE_VALUES for value in values):
         return None
+
+    if model_mode != "legacy":
+        cascade_prediction = _predict_cascade(features)
+        if cascade_prediction is not None:
+            return cascade_prediction
+        if model_mode == "cascade":
+            return None
 
     snapshot = get_file_snapshot(_model_path())
     if snapshot is None:

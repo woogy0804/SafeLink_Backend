@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from features.feature_extractor import FEATURE_NAMES
+from ml.inference import CascadePrediction
 from services.model_service import predict_phishing
 
 
@@ -29,9 +30,40 @@ class TestModelService(unittest.TestCase):
             "model_version": "v1",
             "gray_zone": [0.4, 0.6],
         }
-        with patch("services.model_service.get_file_snapshot", return_value=object()):
-            with patch("services.model_service._load_model_snapshot", return_value=artifact):
-                return predict_phishing(self.features)
+        with patch("services.model_service._predict_cascade", return_value=None):
+            with patch("services.model_service.get_file_snapshot", return_value=object()):
+                with patch(
+                    "services.model_service._load_model_snapshot", return_value=artifact
+                ):
+                    return predict_phishing(self.features)
+
+    def test_prefers_two_stage_cascade(self):
+        cascade = CascadePrediction(
+            risk="phishing",
+            phishing_probability=0.91,
+            first_stage_probability=0.52,
+            model_used="logistic_regression_v1+random_forest_v1",
+            gray_zone=True,
+        )
+        with patch("services.model_service.predict_feature_dict", return_value=cascade):
+            prediction = predict_phishing(self.features)
+
+        self.assertEqual(prediction.phishing_probability, 0.91)
+        self.assertEqual(
+            prediction.model_used,
+            "logistic_regression_v1+random_forest_v1",
+        )
+        self.assertTrue(prediction.gray_zone)
+
+    def test_cascade_mode_does_not_use_legacy_model_on_failure(self):
+        with patch.dict(os.environ, {"SAFELINK_MODEL_MODE": "cascade"}):
+            with patch(
+                "services.model_service.predict_feature_dict",
+                side_effect=ValueError("invalid artifact"),
+            ):
+                with patch("services.model_service.get_file_snapshot") as legacy_load:
+                    self.assertIsNone(predict_phishing(self.features))
+        legacy_load.assert_not_called()
 
     def test_predicts_phishing_above_gray_zone(self):
         prediction = self._predict(0.8)

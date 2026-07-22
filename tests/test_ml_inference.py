@@ -54,6 +54,13 @@ class TestMlInference(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Feature keys mismatch"):
             predict_feature_dict(features)
 
+    def test_committed_models_run_in_supported_environment(self):
+        prediction = predict_feature_dict({name: 0 for name in FEATURE_NAMES})
+
+        self.assertIn(prediction.risk, {"safe", "phishing"})
+        self.assertGreaterEqual(prediction.phishing_probability, 0.0)
+        self.assertLessEqual(prediction.phishing_probability, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

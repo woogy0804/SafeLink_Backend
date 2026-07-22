@@ -2,11 +2,14 @@
 
 import csv
 import json
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.exceptions import InconsistentVersionWarning
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -68,7 +71,11 @@ def save_artifact(estimator, model_name: str, output_path: Path) -> dict:
 
 
 def load_artifact(path: Path) -> dict:
-    artifact = joblib.load(path)
+    # These repository-owned artifacts are validated immediately below and
+    # have an explicit adapter for the one incompatible estimator attribute.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", InconsistentVersionWarning)
+        artifact = joblib.load(path)
     if not isinstance(artifact, dict):
         raise ValueError(f"Invalid model artifact: {path}")
     if artifact.get("feature_names") != list(FEATURE_NAMES):
@@ -76,6 +83,13 @@ def load_artifact(path: Path) -> dict:
     estimator = artifact.get("estimator")
     if not callable(getattr(estimator, "predict_proba", None)):
         raise ValueError(f"Estimator does not support predict_proba: {path}")
+    # Models committed by B were serialized by a newer scikit-learn release.
+    # scikit-learn 1.6 still reads their fitted coefficients, but expects this
+    # constructor attribute to exist when predict_proba() is called.
+    if isinstance(estimator, LogisticRegression) and not hasattr(
+        estimator, "multi_class"
+    ):
+        estimator.multi_class = "auto"
     return artifact
 
 
