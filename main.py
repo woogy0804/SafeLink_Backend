@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from routes.detect_routes import router as detect_router
 from utils.response_formatter import format_error_response
 
@@ -11,6 +14,11 @@ app = FastAPI(
 )
 
 app.include_router(detect_router)
+app.mount(
+    "/app",
+    StaticFiles(directory=Path(__file__).parent / "frontend", html=True),
+    name="frontend",
+)
 
 
 @app.exception_handler(RequestValidationError)

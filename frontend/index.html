@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="URL의 피싱 위험을 빠르게 분석하는 SafeLink"
+    />
+    <title>SafeLink — URL 보안 검사</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="site-header">
+      <a class="brand" href="/app/" aria-label="SafeLink 홈">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28" role="img">
+            <path d="M14 2.6 23 6v6.9c0 5.8-3.7 10.2-9 12.5-5.3-2.3-9-6.7-9-12.5V6l9-3.4Z" />
+            <path d="m10 14 2.5 2.5L18.5 10" />
+          </svg>
+        </span>
+        <span>SafeLink</span>
+      </a>
+      <div class="system-status">
+        <span class="status-dot"></span>
+        AI 탐지 시스템
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow">
+          <span>12개 보안 신호 분석</span>
+          <span class="eyebrow-line"></span>
+          <span>2단계 AI 판별</span>
+        </div>
+
+        <h1>
+          클릭하기 전에,<br />
+          <span>링크부터 확인하세요.</span>
+        </h1>
+        <p class="hero-copy">
+          의심스러운 URL을 입력하면 도메인, 인증서, 페이지 구조를 분석해
+          피싱 위험을 알려드립니다.
+        </p>
+
+        <form id="scan-form" class="scan-form" novalidate>
+          <label class="sr-only" for="url-input">검사할 URL</label>
+          <div class="input-shell">
+            <span class="link-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M10.6 13.4a3.4 3.4 0 0 0 4.8 0l3-3a3.4 3.4 0 0 0-4.8-4.8L12 7.2" />
+                <path d="M13.4 10.6a3.4 3.4 0 0 0-4.8 0l-3 3a3.4 3.4 0 0 0 4.8 4.8l1.6-1.6" />
+              </svg>
+            </span>
+            <input
+              id="url-input"
+              name="url"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="https://example.com"
+              aria-describedby="form-message"
+              required
+            />
+            <button id="scan-button" type="submit">
+              <span class="button-label">URL 검사</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p id="form-message" class="form-message" aria-live="polite">
+            URL은 서버에서 안전하게 분석되며 별도로 저장하지 않습니다.
+          </p>
+        </form>
+      </section>
+
+      <section id="result-panel" class="result-panel" aria-live="polite" hidden>
+        <div class="result-top">
+          <div class="result-heading">
+            <div id="result-icon" class="result-icon" aria-hidden="true"></div>
+            <div>
+              <p class="result-kicker">분석 완료</p>
+              <h2 id="result-title">안전한 링크입니다</h2>
+              <p id="result-url" class="result-url"></p>
+            </div>
+          </div>
+          <div class="score-wrap">
+            <div id="score-ring" class="score-ring">
+              <div>
+                <strong id="score-value">0</strong>
+                <span>위험도</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-summary">
+          <p id="result-message"></p>
+          <div class="meta-list">
+            <span id="model-used">AI 모델</span>
+            <span id="gray-zone" hidden>2차 정밀 분석</span>
+          </div>
+        </div>
+
+        <div class="features-section">
+          <button
+            id="feature-toggle"
+            class="feature-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="feature-grid"
+          >
+            <span>세부 분석 결과</span>
+            <span class="toggle-icon" aria-hidden="true">+</span>
+          </button>
+          <div id="feature-grid" class="feature-grid" hidden></div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="SafeLink 분석 방식">
+        <article>
+          <span class="trust-number">01</span>
+          <div>
+            <h3>주소 구조 분석</h3>
+            <p>IP, 하이픈, 서브도메인 패턴 확인</p>
+          </div>
+        </article>
+        <article>
+          <span class="trust-number">02</span>
+          <div>
+            <h3>보안 상태 확인</h3>
+            <p>SSL 인증서와 도메인 정보 검증</p>
+          </div>
+        </article>
+        <article>
+          <span class="trust-number">03</span>
+          <div>
+            <h3>AI 위험 판별</h3>
+            <p>두 단계 모델로 피싱 가능성 분석</p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>SafeLink <span>·</span> First MVP</p>
+      <p>판정 결과는 참고용이며 100% 안전을 보장하지 않습니다.</p>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
